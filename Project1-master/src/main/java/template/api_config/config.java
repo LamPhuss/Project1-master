@@ -1,4 +1,5 @@
 package template.api_config;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
@@ -35,34 +36,50 @@ public class config {
     public static void main(String[] args) throws IOException, InterruptedException {
         // Step 1: Get an access token
         String accessToken = getAccessToken();
+        // Set up variables for the request
+        String userId = "3eb3c149-d420-4fb3-a00a-f46217a15920"; // ID của người dùng muốn gán giấy phép
+        String skuId = "c42b9cae-ea4f-4ab7-9717-81576235ccac"; // SKU ID của giấy phép muốn gán
+        String requestUrl = "https://graph.microsoft.com/v1.0/users/" + userId + "/assignLicense";
+        try {
+            URL url = new URL(requestUrl);
+            HttpURLConnection con = (HttpURLConnection) url.openConnection();
+            con.setRequestMethod("POST");
+            con.setRequestProperty("Authorization", "Bearer " + accessToken);
+            con.setRequestProperty("Content-Type", "application/json");
+            con.setDoOutput(true);
 
-        // Set the API endpoint and user ID
-        String endpoint = "https://graph.microsoft.com/v1.0/users/{user-id}";
-        String userId = "1234-5678-91011";
+            // Tạo payload JSON
+            String requestBody = "{ \"addLicenses\": [{\"disabledPlans\":[],\"skuId\":\"" + skuId + "\"}],\"removeLicenses\":[]}";
+            con.getOutputStream().write(requestBody.getBytes("utf-8"));
 
-        // Create a URL object and open a connection
-        URL url = new URL(endpoint.replace("{user-id}", userId));
-        HttpURLConnection con = (HttpURLConnection) url.openConnection();
+            // Ghi payload vào OutputStream và gửi yêu cầu
+            int responseCode = con.getResponseCode();
 
-        // Set the request method to DELETE
-        con.setRequestMethod("DELETE");
-
-        // Set the authorization header
-        con.setRequestProperty("Authorization", "Bearer " + accessToken);
-
-        // Make the request and check for errors
-        int responseCode = con.getResponseCode();
-        if (responseCode >= 200 && responseCode < 300) {
-            // User deleted successfully
-            System.out.println("User deleted successfully.");
-        } else {
-            // Handle the error response
-            System.out.println("Error deleting user: " + con.getResponseMessage());
+            Gson gson = new GsonBuilder().create();
+            BufferedReader in;
+            if (responseCode >= 400) {
+                in = new BufferedReader(new InputStreamReader(con.getErrorStream()));
+                StringBuilder errorResponse = new StringBuilder();
+                String line;
+                while ((line = in.readLine()) != null) {
+                    errorResponse.append(line);
+                }
+                // Parse the JSON string
+                JsonObject jsonObject = gson.fromJson(errorResponse.toString(), JsonObject.class);
+                // Get the value of the "message" property
+                String message = jsonObject.getAsJsonObject("error").get("message").getAsString();
+                // Print the error message
+                System.out.println("Error: " + message);
+            } else {
+                in = new BufferedReader(new InputStreamReader(con.getInputStream()));
+                System.out.println("Assign license success");
+                System.out.println(in.readLine());
+            }
+            in.close();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
-
     }
-
-
 
 
     public static String getAccessToken() throws IOException, InterruptedException {

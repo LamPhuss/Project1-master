@@ -121,5 +121,48 @@ public class UserServiceImpl implements UserService{
         }
 
     }
+    public void assignLicense(String userId){
+        String skuId = "c42b9cae-ea4f-4ab7-9717-81576235ccac"; // SKU ID của giấy phép muốn gán
+        String requestUrl = "https://graph.microsoft.com/v1.0/users/" + userId + "/assignLicense";
+        try {
+            URL url = new URL(requestUrl);
+            HttpURLConnection con = (HttpURLConnection) url.openConnection();
+            con.setRequestMethod("POST");
+            con.setRequestProperty("Authorization", "Bearer " + token);
+            con.setRequestProperty("Content-Type", "application/json");
+            con.setDoOutput(true);
+
+            // Tạo payload JSON
+            String requestBody = "{ \"addLicenses\": [{\"disabledPlans\":[],\"skuId\":\"" + skuId + "\"}],\"removeLicenses\":[]}";
+            con.getOutputStream().write(requestBody.getBytes("utf-8"));
+
+            // Ghi payload vào OutputStream và gửi yêu cầu
+            int responseCode = con.getResponseCode();
+
+            Gson gson = new GsonBuilder().create();
+            BufferedReader in;
+            if (responseCode >= 400) {
+                in = new BufferedReader(new InputStreamReader(con.getErrorStream()));
+                StringBuilder errorResponse = new StringBuilder();
+                String line;
+                while ((line = in.readLine()) != null) {
+                    errorResponse.append(line);
+                }
+                // Parse the JSON string
+                JsonObject jsonObject = gson.fromJson(errorResponse.toString(), JsonObject.class);
+                // Get the value of the "message" property
+                String message = jsonObject.getAsJsonObject("error").get("message").getAsString();
+                // Print the error message
+                System.out.println("Error: " + message);
+            } else {
+                in = new BufferedReader(new InputStreamReader(con.getInputStream()));
+                System.out.println("Assign license success");
+                System.out.println(in.readLine());
+            }
+            in.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
 }
