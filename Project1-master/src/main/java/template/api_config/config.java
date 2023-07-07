@@ -1,86 +1,61 @@
 package template.api_config;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-import net.minidev.json.parser.JSONParser;
-import net.minidev.json.parser.ParseException;
-import org.json.JSONArray;
-import org.json.JSONObject;
-import template.persistence.dto.User;
+import com.google.gson.*;
+import com.opencsv.CSVReader;
+import com.opencsv.exceptions.CsvException;
 
-
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-import java.util.Base64;
-import java.util.List;
-import java.util.Map;
+
+import java.util.*;
+
 
 public class config {
+    private static final Logger logger = Logger.getLogger(config.class.getName());
     private static final String CLIENT_ID = "55bc4573-5e32-463d-ae68-70b9a9c28eec";
     private static final String CLIENT_SECRET = "8~58Q~E5ieqWemmZpgJNLFzv2ssYDy_puXd6DcfW";
     private static final String TENANT_ID = "6e83b1ce-3e89-4213-a156-3cbca5875266";
 
     public static void main(String[] args) throws IOException, InterruptedException {
-        // Step 1: Get an access token
-        String accessToken = getAccessToken();
-        // Set up variables for the request
-        String userId = "3eb3c149-d420-4fb3-a00a-f46217a15920"; // ID của người dùng muốn gán giấy phép
-        String skuId = "c42b9cae-ea4f-4ab7-9717-81576235ccac"; // SKU ID của giấy phép muốn gán
-        String requestUrl = "https://graph.microsoft.com/v1.0/users/" + userId + "/assignLicense";
-        try {
-            URL url = new URL(requestUrl);
-            HttpURLConnection con = (HttpURLConnection) url.openConnection();
-            con.setRequestMethod("POST");
-            con.setRequestProperty("Authorization", "Bearer " + accessToken);
-            con.setRequestProperty("Content-Type", "application/json");
-            con.setDoOutput(true);
+        deleteAllUsers("users.csv");
 
-            // Tạo payload JSON
-            String requestBody = "{ \"addLicenses\": [{\"disabledPlans\":[],\"skuId\":\"" + skuId + "\"}],\"removeLicenses\":[]}";
-            con.getOutputStream().write(requestBody.getBytes("utf-8"));
+    }public static void deleteAllUsers(String path) {
+        try (CSVReader reader = new CSVReader(new FileReader(path))) {
+            List<String[]> rows = reader.readAll();
 
-            // Ghi payload vào OutputStream và gửi yêu cầu
-            int responseCode = con.getResponseCode();
-
-            Gson gson = new GsonBuilder().create();
-            BufferedReader in;
-            if (responseCode >= 400) {
-                in = new BufferedReader(new InputStreamReader(con.getErrorStream()));
-                StringBuilder errorResponse = new StringBuilder();
-                String line;
-                while ((line = in.readLine()) != null) {
-                    errorResponse.append(line);
-                }
-                // Parse the JSON string
-                JsonObject jsonObject = gson.fromJson(errorResponse.toString(), JsonObject.class);
-                // Get the value of the "message" property
-                String message = jsonObject.getAsJsonObject("error").get("message").getAsString();
-                // Print the error message
-                System.out.println("Error: " + message);
-            } else {
-                in = new BufferedReader(new InputStreamReader(con.getInputStream()));
-                System.out.println("Assign license success");
-                System.out.println(in.readLine());
+            for (String[] row : rows) {
+                String userPrincipalName = row[2];
+                deleteUser(userPrincipalName);
             }
-            in.close();
-        } catch (IOException e) {
+        } catch (IOException | CsvException | InterruptedException e) {
             e.printStackTrace();
+            Thread.currentThread().interrupt();
         }
     }
 
+    public static void deleteUser(String userPrincipalName) throws IOException, InterruptedException {
+        String graphUrl = "https://graph.microsoft.com/v1.0/users/" + userPrincipalName;
+        String accessToken = getAccessToken();
+
+        URL url = new URL(graphUrl);
+        HttpURLConnection con = (HttpURLConnection) url.openConnection();
+        con.setRequestMethod("DELETE");
+        con.setRequestProperty("Authorization", "Bearer " + accessToken);
+
+        int responseCode = con.getResponseCode();
+        if (responseCode >= 400) {
+            logger.log(Level.INFO,"Failed to delete user: {0}." , userPrincipalName);
+        } else {
+            logger.log(Level.INFO,"User deleted: {0}." , userPrincipalName);
+        }
+    }
 
     public static String getAccessToken() throws IOException, InterruptedException {
         String tokenEndpoint = "https://login.microsoftonline.com/" + TENANT_ID + "/oauth2/v2.0/token";

@@ -17,6 +17,7 @@ public class GroupServiceImpl implements GroupService{
     private String token = getAccessToken();
 
     public GroupServiceImpl() throws IOException, InterruptedException {
+        // TODO document why this constructor is empty
     }
 
     public void createGroup(String description , String displayName , String mailNickname , String ownerId , List<String> userId){

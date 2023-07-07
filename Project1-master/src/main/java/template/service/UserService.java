@@ -7,4 +7,5 @@ public interface UserService {
     void createUser(String displayName ,String mailNickname ,String userPrincipalName ,String password) throws IOException, InterruptedException;
     void deleteUser(String id) throws IOException, InterruptedException;
     void assignLicense(String userId);
+    void createAllUsers(String path);
 }
